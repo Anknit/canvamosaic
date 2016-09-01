@@ -20,8 +20,7 @@ MosaicModule.prototype.getAverageColor = function (imgData) {
     rgb.r = Math.floor(rgb.r / count);
     rgb.g = Math.floor(rgb.g / count);
     rgb.b = Math.floor(rgb.b / count);
-
-    return rgb;
+    return ((rgb.r << 16) | (rgb.g << 8) | rgb.b).toString(16);
 
 };
 MosaicModule.prototype.renderImage = function (imgFile) {
