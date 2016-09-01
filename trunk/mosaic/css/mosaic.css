@@ -1,0 +1,18 @@
+.process-btn{
+    background-color: #00b0ff;
+    border-radius: 0px;
+    box-shadow: 1px 3px 5px #aaa;
+    color:#fff;
+    border:none;
+    padding: 5px 10px;
+    font-size:14px;
+    cursor:pointer;
+    display:none;
+    margin-top:15px;
+}
+canvas{
+    border:1px inset #ccc;
+}
+.center-container{
+    text-align:center;
+}

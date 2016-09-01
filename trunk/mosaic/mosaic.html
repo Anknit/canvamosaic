@@ -1,11 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <link href="css/mosaic.css" type="text/css" rel="stylesheet" />
         <title>Mosaic</title>
     </head>
     <body>
-        <input type="file" id="uploadButton" />
-        <canvas id="mosaic-canvas"></canvas>
+        <div class="center-container">
+            <canvas id="mosaic-canvas" width="400" height="400"></canvas>
+        </div>
+        <div class="center-container">
+            <input type="file" id="uploadButton" />
+            <button id="processButton" type="button" class="process-btn">Create Mosaic</button>
+        </div>
     <script type="text/javascript" src="js/mosaic.js"></script>
     <script type="text/javascript" src="js/client.js"></script>
     </body>
