@@ -1,8 +1,9 @@
+/*global TILE_HEIGHT, TILE_WIDTH*/
+
 /*
 Constructor Function for Mosaic Module
 Initialize height and width parameters and place canvas elem in memory
 */
-
 function MosaicModule() {
     'use strict';
     this.tileHeight = TILE_HEIGHT;
@@ -11,35 +12,6 @@ function MosaicModule() {
     this.context = this.canvasElem.getContext('2d');
     this.mosaicData = null;
 }
-
-/*
-Function : getAverageColor
-Module function to get Average color from a tile imageData
-@params : imgData => Canvas imagedata of tile
-@return : <String> Average Hex Value of the tile 
-*/
-
-MosaicModule.prototype.getAverageColor = function (imgData) {
-    'use strict';
-    var length = imgData.length,
-        rgb = {r: 0, g: 0, b: 0},
-        i = -4,
-        count = 0;
-    while ((i += 4) < length) {
-        count = count + 1;
-        rgb.r += imgData[i];
-        rgb.g += imgData[i + 1];
-        rgb.b += imgData[i + 2];
-    }
-  
-    // floor the average values to give correct rgb values (ie: round number values)
-    rgb.r = Math.floor(rgb.r / count);
-    rgb.g = Math.floor(rgb.g / count);
-    rgb.b = Math.floor(rgb.b / count);
-
-    // get Hex value from RGB 
-    return rgbToHex(rgb.r, rgb.g, rgb.b);
-};
 
 /*
 Function : renderImage
@@ -77,25 +49,6 @@ MosaicModule.prototype.renderImage = function (imgFile) {
 };
 
 /*
-Function : fetchTileFromServer
-Module function to fetch tile of corresponding hex value provided
-@params :   hexVal   => HexValue computed by the app
-            callback => Callback Function for the server response
-*/
-
-MosaicModule.prototype.fetchTileFromServer = function (hexVal, callback) {
-    'use strict';
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", "./color/" + hexVal, true);
-    xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4 && xhr.status === 200) {
-            callback(xhr.response, xhr.responseXML);
-        }
-    };
-    xhr.send();
-};
-
-/*
 Function : processTile
 Module function to process a tile of the original uploaded image
 @params :   tileData    => ImageData of the rectangular tile area of original image
@@ -107,29 +60,16 @@ MosaicModule.prototype.processTile = function (tileData, tileXPos, tileYPos) {
     'use strict';
     var hexValue = '000000',
         mosaicObj = this,
-        xIndex = Math.ceil(tileXPos/this.tileWidth),
-        yIndex = Math.ceil(tileYPos/this.tileHeight);
-    if (typeof this.mosaicData[yIndex] == "undefined") {
-        this.mosaicData[yIndex] = new Array(this.tileXcount);
+        xIndex = Math.ceil(tileXPos / this.tileWidth),
+        yIndex = Math.ceil(tileYPos / this.tileHeight);
+    if (typeof this.mosaicData[yIndex] === "undefined") {
+        this.mosaicData[yIndex] = [];
+        this.mosaicData[yIndex].length = this.tileXcount;
     }
-    if (typeof this.mosaicRows[yIndex] == "undefined") {
+    if (typeof this.mosaicRows[yIndex] === "undefined") {
         this.mosaicRows[yIndex] = 0;
     }
-    
-    // get Average Hex value of the tile image
-    hexValue = this.getAverageColor(tileData);
-    
-    // fetch corresponding tile from the server
-    this.fetchTileFromServer(hexValue, function (responseText, responseXml) {
-        // Update mapping arrays from the response
-        mosaicObj.mosaicData[yIndex][xIndex] = responseText;
-        mosaicObj.mosaicRows[yIndex] = mosaicObj.mosaicRows[yIndex] + 1;
-
-        // Check whether a complete row is ready to be rendered when its all tiles are fetched from the server
-        if (mosaicObj.mosaicRows[yIndex] === mosaicObj.tileXcount) {
-            mosaicObj.updateRows(yIndex);
-        }
-    });
+    computeWorker.postMessage([tileData, xIndex, yIndex]);
 };
 
 /*
@@ -139,9 +79,11 @@ Module function to check whether row is ready to be rendered
 */
 
 MosaicModule.prototype.updateRows = function (initIndex) {
+    'use strict';
     var i;
-    for(i =0; i<= initIndex;i++) {
-        if (this.mosaicRows[i] !== -1) { // If row is not already rendered
+    var startPoint = this.mosaicRows.lastIndexOf(-1);
+    if (startPoint !== -1 || initIndex === 0) {
+        for (i = startPoint + 1 ; i <= initIndex; i = i + 1) {
             if (this.mosaicRows[i] >= this.tileXcount) {  // If row has fetched all tiles 
                 this.renderRow(i);  // render this row
                 this.mosaicRows[i] = -1;    // update mapping array that corresponding row has been rendered
@@ -159,8 +101,9 @@ Module function to render all tiles of a row
 */
 
 MosaicModule.prototype.renderRow = function (renderIndex) {
+    'use strict';
     var i, mosaicObj = this;
-    for (i = 0;i < this.tileXcount; i++) {
+    for (i = 0; i < this.tileXcount; i = i + 1) {
         var data = this.mosaicData[renderIndex][i], // get data from mapping array
 
             // create a blob Url from the data
@@ -183,8 +126,8 @@ MosaicModule.prototype.renderRow = function (renderIndex) {
         img.src = url;
         
         // set position coordinates for the image
-        img.setAttribute('data-x',tileXPos);
-        img.setAttribute('data-y',tileYPos);
+        img.setAttribute('data-x', tileXPos);
+        img.setAttribute('data-y', tileYPos);
     }
 };
 
@@ -212,23 +155,12 @@ MosaicModule.prototype.processImage = function () {
         xPos = 0;
     }
 };
-/*
-Function to convert rgb component value to hex
-*/
-function componentToHex(c) {
-    var hex = c.toString(16);
-    return hex.length == 1 ? "0" + hex : hex;
-}
-/*
-Function to convert rgb value to hex
-*/
-function rgbToHex(r, g, b) {
-    return componentToHex(r) + componentToHex(g) + componentToHex(b);
-}
 
-// Add eventlistener to input button
 var mosaic = new MosaicModule();
 var upBtn = document.getElementById('uploadButton');
+var mosBtn = document.getElementById('processButton');
+
+// Add eventlistener to input button
 upBtn.addEventListener('change', function () {
     'use strict';
 
@@ -238,8 +170,32 @@ upBtn.addEventListener('change', function () {
 });
 
 // Add eventlistener to create Mosaic button
-var mosBtn = document.getElementById('processButton');
 mosBtn.addEventListener('click', function () {
     'use strict';
     mosaic.processImage();
 });
+
+// Web worker Implementation
+// Requries script name as input
+var dataWorker = new window.Worker("js/dWorker.js");
+var computeWorker = new window.Worker("js/pWorker.js");
+var callback = function (responseText, xIndex, yIndex) {
+    'use strict';
+
+    // Update mapping arrays from the response
+    mosaic.mosaicData[yIndex][xIndex] = responseText;
+    mosaic.mosaicRows[yIndex] = mosaic.mosaicRows[yIndex] + 1;
+
+    // Check whether a complete row is ready to be rendered when its all tiles are fetched from the server
+    if (mosaic.mosaicRows[yIndex] === mosaic.tileXcount) {
+        mosaic.updateRows(yIndex);
+    }
+};
+
+dataWorker.onmessage = function (e) {
+    'use strict';
+    callback(e.data[0], e.data[1], e.data[2]);
+};
+computeWorker.onmessage = function (e) {
+    dataWorker.postMessage([e.data[0], e.data[1], e.data[2]]);
+}
